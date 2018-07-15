@@ -5,6 +5,7 @@ import java.net.Inet4Address;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 
 public class Client {
     private static final int PORT = 20000;
@@ -93,7 +94,6 @@ public class Client {
         socket.setPerformancePreferences(1, 1, 0);
     }
 
-
     private static void todo(Socket client) throws IOException {
         // 得到Socket输出流
         OutputStream outputStream = client.getOutputStream();
@@ -101,18 +101,48 @@ public class Client {
 
         // 得到Socket输入流
         InputStream inputStream = client.getInputStream();
-        byte[] buffer = new byte[128];
+        byte[] buffer = new byte[256];
+        ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+
+        // byte
+        byteBuffer.put((byte) 126);
+
+        // char
+        char c = 'a';
+        byteBuffer.putChar(c);
+
+        // int
+        int i = 2323123;
+        byteBuffer.putInt(i);
+
+        // bool
+        boolean b = true;
+        byteBuffer.put(b ? (byte) 1 : (byte) 0);
+
+        // Long
+        long l = 298789739;
+        byteBuffer.putLong(l);
+
+
+        // float
+        float f = 12.345f;
+        byteBuffer.putFloat(f);
+
+
+        // double
+        double d = 13.31241248782973;
+        byteBuffer.putDouble(d);
+
+        // String
+        String str = "Hello你好！";
+        byteBuffer.put(str.getBytes());
 
         // 发送到服务器
-        outputStream.write(new byte[]{1});
+        outputStream.write(buffer, 0, byteBuffer.position() + 1);
 
         // 接收服务器返回
         int read = inputStream.read(buffer);
-        if (read > 0) {
-            System.out.println("收到数量：" + read + " 数据：" + new String(buffer, 0, read));
-        } else {
-            System.out.println("没有收到：" + read);
-        }
+        System.out.println("收到数量：" + read);
 
         // 资源释放
         outputStream.close();
