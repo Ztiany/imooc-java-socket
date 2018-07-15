@@ -1,5 +1,10 @@
-import java.io.*;
-import java.net.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Inet4Address;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketException;
 
 public class Client {
     private static final int PORT = 20000;
@@ -90,42 +95,27 @@ public class Client {
 
 
     private static void todo(Socket client) throws IOException {
-        // 构建键盘输入流
-        InputStream in = System.in;
-        BufferedReader input = new BufferedReader(new InputStreamReader(in));
-
-
-        // 得到Socket输出流，并转换为打印流
+        // 得到Socket输出流
         OutputStream outputStream = client.getOutputStream();
-        PrintStream socketPrintStream = new PrintStream(outputStream);
 
 
-        // 得到Socket输入流，并转换为BufferedReader
+        // 得到Socket输入流
         InputStream inputStream = client.getInputStream();
-        BufferedReader socketBufferedReader = new BufferedReader(new InputStreamReader(inputStream));
+        byte[] buffer = new byte[128];
 
-        boolean flag = true;
-        do {
-            // 键盘读取一行
-            String str = input.readLine();
-            // 发送到服务器
-            socketPrintStream.println(str);
+        // 发送到服务器
+        outputStream.write(new byte[]{1});
 
-
-            // 从服务器读取一行
-            String echo = socketBufferedReader.readLine();
-            if ("bye".equalsIgnoreCase(echo)) {
-                flag = false;
-            } else {
-                System.out.println(echo);
-            }
-        } while (flag);
+        // 接收服务器返回
+        int read = inputStream.read(buffer);
+        if (read > 0) {
+            System.out.println("收到数量：" + read + " 数据：" + new String(buffer, 0, read));
+        } else {
+            System.out.println("没有收到：" + read);
+        }
 
         // 资源释放
-        socketPrintStream.close();
-        socketBufferedReader.close();
-
+        outputStream.close();
+        inputStream.close();
     }
-
-
 }
