@@ -1,8 +1,5 @@
 import java.io.*;
-import java.net.Inet4Address;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketException;
+import java.net.*;
 
 public class Client {
     private static final int PORT = 20000;
@@ -39,7 +36,8 @@ public class Client {
         Socket socket = new Socket(Proxy.NO_PROXY);
 
         // 新建一份具有HTTP代理的套接字，传输数据将通过www.baidu.com:8080端口转发
-        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(Inet4Address.getByName("www.baidu.com"), 8800));
+        Proxy proxy = new Proxy(Proxy.Type.HTTP,
+                new InetSocketAddress(Inet4Address.getByName("www.baidu.com"), 8800));
         socket = new Socket(proxy);
 
         // 新建一个套接字，并且直接链接到本地20000的服务器上
@@ -57,19 +55,18 @@ public class Client {
         // 绑定到本地20001端口
         socket.bind(new InetSocketAddress(Inet4Address.getLocalHost(), LOCAL_PORT));
 
-
         return socket;
     }
 
     private static void initSocket(Socket socket) throws SocketException {
         // 设置读取超时时间为2秒
-        socket.setSoTimeout(3000);
+        socket.setSoTimeout(2000);
 
         // 是否复用未完全关闭的Socket地址，对于指定bind操作后的套接字有效
         socket.setReuseAddress(true);
 
         // 是否开启Nagle算法
-        //socket.setTcpNoDelay(false);
+        socket.setTcpNoDelay(true);
 
         // 是否需要在长时无数据响应时发送确认数据（类似心跳包），时间大约为2小时
         socket.setKeepAlive(true);
@@ -88,7 +85,7 @@ public class Client {
         socket.setSendBufferSize(64 * 1024 * 1024);
 
         // 设置性能参数：短链接，延迟，带宽的相对重要性
-        socket.setPerformancePreferences(1, 1, 1);
+        socket.setPerformancePreferences(1, 1, 0);
     }
 
 
