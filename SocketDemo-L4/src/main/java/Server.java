@@ -1,11 +1,11 @@
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Inet4Address;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 
 public class Server {
     private static final int PORT = 20000;
@@ -14,6 +14,10 @@ public class Server {
         ServerSocket server = createServerSocket();
 
         initServerSocket(server);
+
+        // 绑定到本地端口上
+        server.bind(new InetSocketAddress(Inet4Address.getLocalHost(), PORT), 50);
+
 
         System.out.println("服务器准备就绪～");
         System.out.println("服务器信息：" + server.getInetAddress() + " P:" + server.getLocalPort());
@@ -34,8 +38,6 @@ public class Server {
     private static ServerSocket createServerSocket() throws IOException {
         // 创建基础的ServerSocket
         ServerSocket serverSocket = new ServerSocket();
-        // 绑定到本地端口上
-        serverSocket.bind(new InetSocketAddress(Inet4Address.getLocalHost(), PORT), 50);
 
         // 绑定到本地端口20000上，并且设置当前可允许等待链接的队列为50个
         //serverSocket = new ServerSocket(PORT);
@@ -44,7 +46,7 @@ public class Server {
         //serverSocket = new ServerSocket(PORT, 50);
 
         // 与上面等同
-        //serverSocket = new ServerSocket(PORT, 50, Inet4Address.getLocalHost());
+        // serverSocket = new ServerSocket(PORT, 50, Inet4Address.getLocalHost());
 
         return serverSocket;
     }
@@ -57,7 +59,7 @@ public class Server {
         serverSocket.setReceiveBufferSize(64 * 1024 * 1024);
 
         // 设置serverSocket#accept超时时间
-        //serverSocket.setSoTimeout(2000);
+        // serverSocket.setSoTimeout(2000);
 
         // 设置性能参数：短链接，延迟，带宽的相对重要性
         serverSocket.setPerformancePreferences(1, 1, 1);
@@ -68,7 +70,6 @@ public class Server {
      */
     private static class ClientHandler extends Thread {
         private Socket socket;
-        private boolean flag = true;
 
         ClientHandler(Socket socket) {
             this.socket = socket;
@@ -81,29 +82,52 @@ public class Server {
                     " P:" + socket.getPort());
 
             try {
-                // 得到打印流，用于数据输出；服务器回送数据使用
-                PrintStream socketOutput = new PrintStream(socket.getOutputStream());
-                // 得到输入流，用于接收数据
-                BufferedReader socketInput = new BufferedReader(new InputStreamReader(
-                        socket.getInputStream()));
+                // 得到套接字流
+                OutputStream outputStream = socket.getOutputStream();
+                InputStream inputStream = socket.getInputStream();
 
-                do {
-                    // 客户端拿到一条数据
-                    String str = socketInput.readLine();
-                    if ("bye".equalsIgnoreCase(str)) {
-                        flag = false;
-                        // 回送
-                        socketOutput.println("bye");
-                    } else {
-                        // 打印到屏幕。并回送数据长度
-                        System.out.println(str);
-                        socketOutput.println("回送：" + str.length());
-                    }
+                byte[] buffer = new byte[256];
+                int readCount = inputStream.read(buffer);
+                ByteBuffer byteBuffer = ByteBuffer.wrap(buffer, 0, readCount);
 
-                } while (flag);
+                // byte
+                byte be = byteBuffer.get();
 
-                socketInput.close();
-                socketOutput.close();
+                // char
+                char c = byteBuffer.getChar();
+
+                // int
+                int i = byteBuffer.getInt();
+
+                // bool
+                boolean b = byteBuffer.get() == 1;
+
+                // Long
+                long l = byteBuffer.getLong();
+
+                // float
+                float f = byteBuffer.getFloat();
+
+                // double
+                double d = byteBuffer.getDouble();
+
+                // String
+                int pos = byteBuffer.position();
+                String str = new String(buffer, pos, readCount - pos - 1);
+
+                System.out.println("收到数量：" + readCount + " 数据："
+                        + be + "\n"
+                        + c + "\n"
+                        + i + "\n"
+                        + b + "\n"
+                        + l + "\n"
+                        + f + "\n"
+                        + d + "\n"
+                        + str + "\n");
+
+                outputStream.write(buffer, 0, readCount);
+                outputStream.close();
+                inputStream.close();
 
             } catch (Exception e) {
                 System.out.println("连接异常断开");
