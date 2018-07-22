@@ -22,20 +22,20 @@ public class ClientHandler {
                 " P:" + socket.getPort());
     }
 
-    public void readToPrint() {
-        readHandler.start();
-    }
-
-    public void send(String str) {
-        writeHandler.send(str);
-    }
-
     public void exit() {
         readHandler.exit();
         writeHandler.exit();
         CloseUtils.close(socket);
         System.out.println("客户端已退出：" + socket.getInetAddress() +
                 " P:" + socket.getPort());
+    }
+
+    public void send(String str) {
+        writeHandler.send(str);
+    }
+
+    public void readToPrint() {
+        readHandler.start();
     }
 
     private void exitBySelf() {
@@ -61,6 +61,7 @@ public class ClientHandler {
             try {
                 // 得到输入流，用于接收数据
                 BufferedReader socketInput = new BufferedReader(new InputStreamReader(inputStream));
+
                 do {
                     // 客户端拿到一条数据
                     String str = socketInput.readLine();
@@ -70,16 +71,16 @@ public class ClientHandler {
                         ClientHandler.this.exitBySelf();
                         break;
                     }
-                    // 打印到屏幕。并回送数据长度
+                    // 打印到屏幕
                     System.out.println(str);
                 } while (!done);
             } catch (Exception e) {
                 if (!done) {
-                    System.out.println("连接异常断开:" + e.getMessage());
+                    System.out.println("连接异常断开");
                     ClientHandler.this.exitBySelf();
                 }
             } finally {
-                // 关闭
+                // 连接关闭
                 CloseUtils.close(inputStream);
             }
         }
@@ -90,21 +91,14 @@ public class ClientHandler {
         }
     }
 
-    /**
-     * 客户端消息处理
-     */
-    static class ClientWriteHandler extends Thread {
+    class ClientWriteHandler {
         private boolean done = false;
         private final PrintStream printStream;
         private final ExecutorService executorService;
 
         ClientWriteHandler(OutputStream outputStream) {
-            this.executorService = Executors.newSingleThreadExecutor();
             this.printStream = new PrintStream(outputStream);
-        }
-
-        void send(String str) {
-            executorService.execute(new WriteRunnable(str));
+            this.executorService = Executors.newSingleThreadExecutor();
         }
 
         void exit() {
@@ -113,8 +107,12 @@ public class ClientHandler {
             executorService.shutdownNow();
         }
 
+        void send(String str) {
+            executorService.execute(new WriteRunnable(str));
+        }
+
         class WriteRunnable implements Runnable {
-            final String msg;
+            private final String msg;
 
             WriteRunnable(String msg) {
                 this.msg = msg;
@@ -122,11 +120,12 @@ public class ClientHandler {
 
             @Override
             public void run() {
-                if (done) {
+                if (ClientWriteHandler.this.done) {
                     return;
                 }
+
                 try {
-                    printStream.println(msg);
+                    ClientWriteHandler.this.printStream.println(msg);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

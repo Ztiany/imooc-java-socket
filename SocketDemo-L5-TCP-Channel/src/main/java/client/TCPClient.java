@@ -23,14 +23,14 @@ public class TCPClient {
         System.out.println("服务器信息：" + socket.getInetAddress() + " P:" + socket.getPort());
 
         try {
-            ReadHandler handler = new ReadHandler(socket.getInputStream());
-            handler.start();
+            ReadHandler readHandler = new ReadHandler(socket.getInputStream());
+            readHandler.start();
 
             // 发送接收数据
             write(socket);
 
-            // 推出操作
-            handler.exit();
+            // 退出操作
+            readHandler.exit();
         } catch (Exception e) {
             System.out.println("异常关闭");
         }
@@ -38,14 +38,12 @@ public class TCPClient {
         // 释放资源
         socket.close();
         System.out.println("客户端已退出～");
-
     }
 
     private static void write(Socket client) throws IOException {
         // 构建键盘输入流
         InputStream in = System.in;
         BufferedReader input = new BufferedReader(new InputStreamReader(in));
-
 
         // 得到Socket输出流，并转换为打印流
         OutputStream outputStream = client.getOutputStream();
@@ -66,7 +64,6 @@ public class TCPClient {
         socketPrintStream.close();
     }
 
-
     static class ReadHandler extends Thread {
         private boolean done = false;
         private final InputStream inputStream;
@@ -81,6 +78,7 @@ public class TCPClient {
             try {
                 // 得到输入流，用于接收数据
                 BufferedReader socketInput = new BufferedReader(new InputStreamReader(inputStream));
+
                 do {
                     String str;
                     try {
@@ -90,18 +88,18 @@ public class TCPClient {
                         continue;
                     }
                     if (str == null) {
-                        System.out.println("连接已关闭，无法读取数据");
+                        System.out.println("连接已关闭，无法读取数据！");
                         break;
                     }
-                    // 打印到屏幕。并回送数据长度
+                    // 打印到屏幕
                     System.out.println(str);
                 } while (!done);
             } catch (Exception e) {
                 if (!done) {
-                    System.out.println("连接异常断开:" + e.getMessage());
+                    System.out.println("连接异常断开：" + e.getMessage());
                 }
             } finally {
-                // 关闭
+                // 连接关闭
                 CloseUtils.close(inputStream);
             }
         }

@@ -34,7 +34,6 @@ public class TCPServer {
             mListener.exit();
         }
 
-        // 推出已链接的客户端
         for (ClientHandler clientHandler : clientHandlerList) {
             clientHandler.exit();
         }
@@ -71,17 +70,17 @@ public class TCPServer {
                 } catch (IOException e) {
                     continue;
                 }
-
                 try {
-                    final ClientHandler clientHandler = new ClientHandler(client, handler -> clientHandlerList.remove(handler));
-                    clientHandlerList.add(clientHandler);
-                    // 读取数据并进行打印
+                    // 客户端构建异步线程
+                    ClientHandler clientHandler = new ClientHandler(client,
+                            handler -> clientHandlerList.remove(handler));
+                    // 读取数据并打印
                     clientHandler.readToPrint();
+                    clientHandlerList.add(clientHandler);
                 } catch (IOException e) {
                     e.printStackTrace();
-                    System.out.println("客户端链接异常：" + e.getMessage());
+                    System.out.println("客户端连接异常：" + e.getMessage());
                 }
-
             } while (!done);
 
             System.out.println("服务器已关闭！");
@@ -96,6 +95,4 @@ public class TCPServer {
             }
         }
     }
-
-
 }

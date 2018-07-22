@@ -17,12 +17,10 @@ public class Server {
 
         UDPProvider.start(TCPConstants.PORT_SERVER);
 
-
-        // 得到输入流，用于接收数据
-        BufferedReader socketInput = new BufferedReader(new InputStreamReader(System.in));
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
         String str;
         do {
-            str = socketInput.readLine();
+            str = bufferedReader.readLine();
             tcpServer.broadcast(str);
         } while (!"00bye00".equalsIgnoreCase(str));
 
