@@ -27,6 +27,10 @@ public class ClientHandler extends Connector {
         setup(socketChannel);
     }
 
+    public String getClientInfo(){
+        return clientInfo;
+    }
+
     public void exit() {
         CloseUtils.close(this);
         System.out.println("客户端已退出：" + clientInfo);
