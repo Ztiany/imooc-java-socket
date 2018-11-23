@@ -7,7 +7,7 @@ import net.qiujuer.library.clink.core.SendPacket;
 import java.io.IOException;
 
 public abstract class AbsSendPacketFrame extends AbsSendFrame {
-    protected SendPacket<?> packet;
+    protected volatile SendPacket<?> packet;
 
     public AbsSendPacketFrame(int length, byte type, byte flag, short identifier, SendPacket packet) {
         super(length, type, flag, identifier);
