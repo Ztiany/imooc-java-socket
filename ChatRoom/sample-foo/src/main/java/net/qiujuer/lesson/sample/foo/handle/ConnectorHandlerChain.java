@@ -1,4 +1,4 @@
-package net.qiujuer.lesson.sample.server.handle;
+package net.qiujuer.lesson.sample.foo.handle;
 
 /**
  * 责任链默认结构封装
@@ -65,13 +65,13 @@ public abstract class ConnectorHandlerChain<Model> {
 
     /**
      * 优先自己消费，如果自己未消费；则给next消费
-     * 若：next=null 或 next 未消费，则回调{@link #consumeAgain(ClientHandler, Object)} 尝试再次消费
+     * 若：next=null 或 next 未消费，则回调{@link #consumeAgain(ConnectorHandler, Object)} 尝试再次消费
      *
-     * @param handler ClientHandler
+     * @param handler ConnectorHandler
      * @param model   Model
      * @return True consume 消费 或 consumeAgain 消费
      */
-    synchronized boolean handle(ClientHandler handler, Model model) {
+    synchronized boolean handle(ConnectorHandler handler, Model model) {
         ConnectorHandlerChain<Model> next = this.next;
 
         // 自己消费
@@ -87,9 +87,9 @@ public abstract class ConnectorHandlerChain<Model> {
         return consumeAgain(handler, model);
     }
 
-    protected abstract boolean consume(ClientHandler handler, Model model);
+    protected abstract boolean consume(ConnectorHandler handler, Model model);
 
-    protected boolean consumeAgain(ClientHandler handler, Model model) {
+    protected boolean consumeAgain(ConnectorHandler handler, Model model) {
         return false;
     }
 }

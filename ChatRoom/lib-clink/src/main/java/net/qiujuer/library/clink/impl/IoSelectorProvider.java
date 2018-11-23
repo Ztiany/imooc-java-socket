@@ -11,9 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class IoSelectorProvider implements IoProvider {
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
@@ -36,9 +34,9 @@ public class IoSelectorProvider implements IoProvider {
         writeSelector = Selector.open();
 
         inputHandlePool = Executors.newFixedThreadPool(20,
-                new IoProviderThreadFactory("IoProvider-Input-Thread-"));
+                new NameableThreadFactory("IoProvider-Input-Thread-"));
         outputHandlePool = Executors.newFixedThreadPool(20,
-                new IoProviderThreadFactory("IoProvider-Output-Thread-"));
+                new NameableThreadFactory("IoProvider-Output-Thread-"));
 
         // 开始输出输入的监听
         startRead();
@@ -271,31 +269,6 @@ public class IoSelectorProvider implements IoProvider {
                     break;
                 }
             }
-        }
-    }
-
-
-    static class IoProviderThreadFactory implements ThreadFactory {
-        private final ThreadGroup group;
-        private final AtomicInteger threadNumber = new AtomicInteger(1);
-        private final String namePrefix;
-
-        IoProviderThreadFactory(String namePrefix) {
-            SecurityManager s = System.getSecurityManager();
-            this.group = (s != null) ? s.getThreadGroup() :
-                    Thread.currentThread().getThreadGroup();
-            this.namePrefix = namePrefix;
-        }
-
-        public Thread newThread(Runnable r) {
-            Thread t = new Thread(group, r,
-                    namePrefix + threadNumber.getAndIncrement(),
-                    0);
-            if (t.isDaemon())
-                t.setDaemon(false);
-            if (t.getPriority() != Thread.NORM_PRIORITY)
-                t.setPriority(Thread.NORM_PRIORITY);
-            return t;
         }
     }
 }

@@ -17,4 +17,11 @@ public interface Scheduler extends Closeable {
      * @return 返回调度任务的控制Future
      */
     ScheduledFuture<?> schedule(Runnable runnable, long delay, TimeUnit unit);
+
+    /**
+     * 分发执行一份简单的任务
+     *
+     * @param runnable Runnable
+     */
+    void delivery(Runnable runnable);
 }

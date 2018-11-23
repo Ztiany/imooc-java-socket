@@ -1,9 +1,10 @@
-package net.qiujuer.lesson.sample.server.handle;
+package net.qiujuer.lesson.sample.foo.handle;
 
 
 import net.qiujuer.lesson.sample.foo.Foo;
 import net.qiujuer.library.clink.box.StringReceivePacket;
 import net.qiujuer.library.clink.core.Connector;
+import net.qiujuer.library.clink.core.IoContext;
 import net.qiujuer.library.clink.core.Packet;
 import net.qiujuer.library.clink.core.ReceivePacket;
 import net.qiujuer.library.clink.utils.CloseUtils;
@@ -11,19 +12,16 @@ import net.qiujuer.library.clink.utils.CloseUtils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.Executor;
 
-public class ClientHandler extends Connector {
+public class ConnectorHandler extends Connector {
     private final File cachePath;
     private final String clientInfo;
-    private final Executor deliveryPool;
     private final ConnectorCloseChain closeChain = new DefaultPrintConnectorCloseChain();
     private final ConnectorStringPacketChain stringPacketChain = new DefaultNonConnectorStringPacketChain();
 
-    public ClientHandler(SocketChannel socketChannel, File cachePath, Executor deliveryPool) throws IOException {
+    public ConnectorHandler(SocketChannel socketChannel, File cachePath) throws IOException {
         this.clientInfo = socketChannel.getRemoteAddress().toString();
         this.cachePath = cachePath;
-        this.deliveryPool = deliveryPool;
         setup(socketChannel);
     }
 
@@ -36,7 +34,6 @@ public class ClientHandler extends Connector {
      */
     public void exit() {
         CloseUtils.close(this);
-        closeChain.handle(this, this);
     }
 
     /**
@@ -75,7 +72,7 @@ public class ClientHandler extends Connector {
      * @param packet StringReceivePacket
      */
     private void deliveryStringPacket(StringReceivePacket packet) {
-        deliveryPool.execute(() -> stringPacketChain.handle(this, packet));
+        IoContext.get().getScheduler().delivery(() -> stringPacketChain.handle(this, packet));
     }
 
     /**

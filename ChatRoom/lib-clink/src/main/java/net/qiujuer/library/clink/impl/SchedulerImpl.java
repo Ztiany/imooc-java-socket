@@ -2,17 +2,17 @@ package net.qiujuer.library.clink.impl;
 
 import net.qiujuer.library.clink.core.Scheduler;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 public class SchedulerImpl implements Scheduler {
     private final ScheduledExecutorService scheduledExecutorService;
+    private final ExecutorService deliveryPool;
 
     public SchedulerImpl(int poolSize) {
         this.scheduledExecutorService = Executors.newScheduledThreadPool(poolSize,
-                new IoSelectorProvider.IoProviderThreadFactory("Scheduler-Thread-"));
+                new NameableThreadFactory("Scheduler-Thread-"));
+        this.deliveryPool = Executors.newFixedThreadPool(1,
+                new NameableThreadFactory("Delivery-Thread-"));
     }
 
     @Override
@@ -21,7 +21,13 @@ public class SchedulerImpl implements Scheduler {
     }
 
     @Override
+    public void delivery(Runnable runnable) {
+        deliveryPool.execute(runnable);
+    }
+
+    @Override
     public void close() {
         scheduledExecutorService.shutdownNow();
+        deliveryPool.shutdownNow();
     }
 }

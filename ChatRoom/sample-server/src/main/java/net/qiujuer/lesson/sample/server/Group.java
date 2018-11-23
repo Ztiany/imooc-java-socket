@@ -1,7 +1,7 @@
 package net.qiujuer.lesson.sample.server;
 
-import net.qiujuer.lesson.sample.server.handle.ClientHandler;
-import net.qiujuer.lesson.sample.server.handle.ConnectorStringPacketChain;
+import net.qiujuer.lesson.sample.foo.handle.ConnectorHandler;
+import net.qiujuer.lesson.sample.foo.handle.ConnectorStringPacketChain;
 import net.qiujuer.library.clink.box.StringReceivePacket;
 
 import java.util.ArrayList;
@@ -10,7 +10,7 @@ import java.util.List;
 class Group {
     private final String name;
     private final GroupMessageAdapter adapter;
-    private final List<ClientHandler> members = new ArrayList<>();
+    private final List<ConnectorHandler> members = new ArrayList<>();
 
     Group(String name, GroupMessageAdapter adapter) {
         this.name = name;
@@ -27,7 +27,7 @@ class Group {
      * @param handler 客户端
      * @return 是否成功
      */
-    boolean addMember(ClientHandler handler) {
+    boolean addMember(ConnectorHandler handler) {
         synchronized (members) {
             if (!members.contains(handler)) {
                 members.add(handler);
@@ -46,7 +46,7 @@ class Group {
      * @param handler 客户端
      * @return 是否移除成功
      */
-    boolean removeMember(ClientHandler handler) {
+    boolean removeMember(ConnectorHandler handler) {
         synchronized (members) {
             if (members.remove(handler)) {
                 handler.getStringPacketChain()
@@ -65,9 +65,9 @@ class Group {
     private class ForwardConnectorStringPacketChain extends ConnectorStringPacketChain {
 
         @Override
-        protected boolean consume(ClientHandler handler, StringReceivePacket stringReceivePacket) {
+        protected boolean consume(ConnectorHandler handler, StringReceivePacket stringReceivePacket) {
             synchronized (members) {
-                for (ClientHandler member : members) {
+                for (ConnectorHandler member : members) {
                     if (member == handler) {
                         continue;
                     }
@@ -88,6 +88,6 @@ class Group {
          * @param handler 客户端
          * @param msg     消息
          */
-        void sendMessageToClient(ClientHandler handler, String msg);
+        void sendMessageToClient(ConnectorHandler handler, String msg);
     }
 }
