@@ -170,7 +170,7 @@ public class ClientHandler {
             private final String msg;
 
             WriteRunnable(String msg) {
-                this.msg = msg;
+                this.msg = msg + '\n';
             }
 
             @Override
