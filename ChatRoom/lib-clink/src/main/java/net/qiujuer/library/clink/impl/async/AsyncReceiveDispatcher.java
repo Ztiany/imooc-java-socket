@@ -122,7 +122,7 @@ public class AsyncReceiveDispatcher implements ReceiveDispatcher,
      */
     @Override
     public ReceivePacket takePacket(byte type, long length, byte[] headerInfo) {
-        return callback.onArrivedNewPacket(type, length);
+        return callback.onArrivedNewPacket(type, length, headerInfo);
     }
 
     /**
