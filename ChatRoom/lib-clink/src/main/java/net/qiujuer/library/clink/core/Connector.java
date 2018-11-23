@@ -4,6 +4,7 @@ import net.qiujuer.library.clink.box.*;
 import net.qiujuer.library.clink.impl.SocketChannelAdapter;
 import net.qiujuer.library.clink.impl.async.AsyncReceiveDispatcher;
 import net.qiujuer.library.clink.impl.async.AsyncSendDispatcher;
+import net.qiujuer.library.clink.impl.bridge.BridgeSocketDispatcher;
 import net.qiujuer.library.clink.utils.CloseUtils;
 
 import java.io.Closeable;
@@ -47,6 +48,62 @@ public abstract class Connector implements Closeable, SocketChannelAdapter.OnCha
 
     public void send(SendPacket packet) {
         sendDispatcher.send(packet);
+    }
+
+    /**
+     * 改变当前调度器为桥接模式
+     */
+    public void changeToBridge() {
+        if (receiveDispatcher instanceof BridgeSocketDispatcher) {
+            // 已改变直接返回
+            return;
+        }
+
+        // 老的停止
+        receiveDispatcher.stop();
+
+        // 构建新的接收者调度器
+        BridgeSocketDispatcher dispatcher = new BridgeSocketDispatcher(receiver);
+        receiveDispatcher = dispatcher;
+        // 启动
+        dispatcher.start();
+    }
+
+    /**
+     * 将另外一个链接的发送者绑定到当前链接的桥接调度器上实现两个链接的桥接功能
+     *
+     * @param sender 另外一个链接的发送者
+     */
+    public void bindToBridge(Sender sender) {
+        if (sender == this.sender) {
+            throw new UnsupportedOperationException("Can not set current connector sender to self bridge mode!");
+        }
+
+        if (!(receiveDispatcher instanceof BridgeSocketDispatcher)) {
+            throw new IllegalStateException("receiveDispatcher is not BridgeSocketDispatcher!");
+        }
+
+        ((BridgeSocketDispatcher) receiveDispatcher).bindSender(sender);
+    }
+
+    /**
+     * 将之前链接的发送者解除绑定，解除桥接数据发送功能
+     */
+    public void unBindToBridge() {
+        if (!(receiveDispatcher instanceof BridgeSocketDispatcher)) {
+            throw new IllegalStateException("receiveDispatcher is not BridgeSocketDispatcher!");
+        }
+
+        ((BridgeSocketDispatcher) receiveDispatcher).bindSender(null);
+    }
+
+    /**
+     * 获取当前链接的发送者
+     *
+     * @return 发送者
+     */
+    public Sender getSender() {
+        return sender;
     }
 
     /**

@@ -64,7 +64,7 @@ public class SocketChannelAdapter implements Sender, Receiver, Cloneable {
             throw new IOException("Current channel is closed!");
         }
         // 进行Callback状态监测，判断是否处于自循环状态
-        inputCallback.checkAttachNull();
+        outputCallback.checkAttachNull();
         // 当前发送的数据附加到回调中
         return ioProvider.registerOutput(channel, outputCallback);
     }
@@ -97,7 +97,11 @@ public class SocketChannelAdapter implements Sender, Receiver, Cloneable {
             // 刷新读取时间
             lastReadTime = System.currentTimeMillis();
 
-            IoArgs.IoArgsEventProcessor processor = receiveIoEventProcessor;
+            final IoArgs.IoArgsEventProcessor processor = receiveIoEventProcessor;
+            if (processor == null) {
+                return;
+            }
+
             if (args == null) {
                 args = processor.provideIoArgs();
             }
@@ -113,7 +117,8 @@ public class SocketChannelAdapter implements Sender, Receiver, Cloneable {
                         System.out.println("Current read zero data!");
                     }
 
-                    if (args.remained()) {
+                    // 检查是否还有空闲区间，以及是否需要填满空闲区间
+                    if (args.remained() && args.isNeedConsumeRemaining()) {
                         // 附加当前未消费完成的args
                         attach = args;
                         // 再次注册数据发送
@@ -142,7 +147,11 @@ public class SocketChannelAdapter implements Sender, Receiver, Cloneable {
             // 刷新输出时间
             lastWriteTime = System.currentTimeMillis();
 
-            IoArgs.IoArgsEventProcessor processor = sendIoEventProcessor;
+            final IoArgs.IoArgsEventProcessor processor = sendIoEventProcessor;
+            if (processor == null) {
+                return;
+            }
+
             if (args == null) {
                 // 拿一份新的IoArgs
                 args = processor.provideIoArgs();
@@ -159,7 +168,8 @@ public class SocketChannelAdapter implements Sender, Receiver, Cloneable {
                         System.out.println("Current write zero data!");
                     }
 
-                    if (args.remained()) {
+                    // 检查是否还有未消费数据，以及是否需要一次消费完全
+                    if (args.remained() && args.isNeedConsumeRemaining()) {
                         // 附加当前未消费完成的args
                         attach = args;
                         // 再次注册数据发送
