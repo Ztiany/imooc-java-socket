@@ -6,6 +6,10 @@ import java.util.UUID;
 
 public class Foo {
     public static final String COMMAND_EXIT = "00bye00";
+    public static final String COMMAND_GROUP_JOIN = "--m g join";
+    public static final String COMMAND_GROUP_LEAVE = "--m g leave";
+
+    public static final String DEFAULT_GROUP_NAME = "IMOOC";
 
     private static final String CACHE_DIR = "cache";
 

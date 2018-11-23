@@ -1,6 +1,11 @@
 package net.qiujuer.lesson.sample.server;
 
+import net.qiujuer.lesson.sample.foo.Foo;
 import net.qiujuer.lesson.sample.server.handle.ClientHandler;
+import net.qiujuer.lesson.sample.server.handle.ConnectorCloseChain;
+import net.qiujuer.lesson.sample.server.handle.ConnectorStringPacketChain;
+import net.qiujuer.library.clink.box.StringReceivePacket;
+import net.qiujuer.library.clink.core.Connector;
 import net.qiujuer.library.clink.utils.CloseUtils;
 
 import java.io.File;
@@ -10,31 +15,34 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class TCPServer implements ClientHandler.ClientHandlerCallback,
-        ServerAcceptor.AcceptListener {
+public class TCPServer implements ServerAcceptor.AcceptListener,
+        Group.GroupMessageAdapter {
     private final int port;
     private final File cachePath;
-    private final ExecutorService forwardingThreadPoolExecutor;
-    private List<ClientHandler> clientHandlerList = new ArrayList<>();
+    private final ExecutorService deliveryPool;
+    private final List<ClientHandler> clientHandlerList = new ArrayList<>();
+    private final Map<String, Group> groups = new HashMap<>();
     private ServerAcceptor acceptor;
     private ServerSocketChannel server;
 
-    private long receiveSize;
-    private long sendSize;
+    private final ServerStatistics statistics = new ServerStatistics();
 
     TCPServer(int port, File cachePath) {
         this.port = port;
         this.cachePath = cachePath;
-        // 转发线程池
-        this.forwardingThreadPoolExecutor = Executors.newSingleThreadExecutor();
+        this.deliveryPool = Executors.newSingleThreadExecutor();
+        this.groups.put(Foo.DEFAULT_GROUP_NAME, new Group(Foo.DEFAULT_GROUP_NAME, this));
     }
 
     boolean start() {
         try {
+            // 启动Acceptor线程
             ServerAcceptor acceptor = new ServerAcceptor(this);
 
             ServerSocketChannel server = ServerSocketChannel.open();
@@ -64,58 +72,51 @@ public class TCPServer implements ClientHandler.ClientHandlerCallback,
         }
     }
 
+    /**
+     * 关闭操作
+     */
     void stop() {
         if (acceptor != null) {
             acceptor.exit();
         }
 
-        CloseUtils.close(server);
-
-        synchronized (TCPServer.this) {
+        synchronized (clientHandlerList) {
             for (ClientHandler clientHandler : clientHandlerList) {
                 clientHandler.exit();
             }
-
             clientHandlerList.clear();
         }
 
+        CloseUtils.close(server);
+
         // 停止线程池
-        forwardingThreadPoolExecutor.shutdownNow();
+        deliveryPool.shutdownNow();
     }
 
-    public synchronized void broadcast(String str) {
-        for (ClientHandler clientHandler : clientHandlerList) {
-            clientHandler.send(str);
-        }
-        // 发送数量增加
-        sendSize += clientHandlerList.size();
-    }
-
-    @Override
-    public synchronized void onSelfClosed(ClientHandler handler) {
-        clientHandlerList.remove(handler);
-    }
-
-    @Override
-    public void onNewMessageArrived(final ClientHandler handler, final String msg) {
-        // 接收数量加一
-        receiveSize++;
-
-        // 异步提交转发任务
-        forwardingThreadPoolExecutor.execute(() -> {
-            synchronized (TCPServer.this) {
-                for (ClientHandler clientHandler : clientHandlerList) {
-                    if (clientHandler.equals(handler)) {
-                        // 跳过自己
-                        continue;
-                    }
-                    // 对其他客户端发送消息
-                    clientHandler.send(msg);
-                    // 发送数量加一
-                    sendSize++;
-                }
+    /**
+     * 进行广播发送，发给所有客户端
+     *
+     * @param str 消息
+     */
+    void broadcast(String str) {
+        str = "系统通知：" + str;
+        synchronized (clientHandlerList) {
+            for (ClientHandler clientHandler : clientHandlerList) {
+                sendMessageToClient(clientHandler, str);
             }
-        });
+        }
+    }
+
+    /**
+     * 发送消息给某个客户端
+     *
+     * @param handler 客户端
+     * @param msg     消息
+     */
+    @Override
+    public void sendMessageToClient(ClientHandler handler, String msg) {
+        handler.send(msg);
+        statistics.sendSize++;
     }
 
     /**
@@ -124,16 +125,31 @@ public class TCPServer implements ClientHandler.ClientHandlerCallback,
     Object[] getStatusString() {
         return new String[]{
                 "客户端数量：" + clientHandlerList.size(),
-                "发送数量：" + sendSize,
-                "接收数量：" + receiveSize
+                "发送数量：" + statistics.sendSize,
+                "接收数量：" + statistics.receiveSize
         };
     }
 
+    /**
+     * 新客户端链接时回调
+     *
+     * @param channel 新客户端
+     */
     @Override
     public void onNewSocketArrived(SocketChannel channel) {
         try {
-            ClientHandler clientHandler = new ClientHandler(channel, this, cachePath);
+            ClientHandler clientHandler = new ClientHandler(channel, cachePath, deliveryPool);
             System.out.println(clientHandler.getClientInfo() + ":Connected!");
+
+            // 添加收到消息的处理责任链
+            clientHandler.getStringPacketChain()
+                    .appendLast(statistics.statisticsChain())
+                    .appendLast(new ParseCommandConnectorStringPacketChain());
+
+            // 添加关闭链接时的责任链
+            clientHandler.getCloseChain()
+                    .appendLast(new RemoveQueueOnConnectorClosedChain());
+
             synchronized (TCPServer.this) {
                 clientHandlerList.add(clientHandler);
                 System.out.println("当前客户端数量：" + clientHandlerList.size());
@@ -142,6 +158,57 @@ public class TCPServer implements ClientHandler.ClientHandlerCallback,
             e.printStackTrace();
             System.out.println("客户端链接异常：" + e.getMessage());
         }
+    }
 
+
+    /**
+     * 移除队列，在链接关闭回调时
+     */
+    private class RemoveQueueOnConnectorClosedChain extends ConnectorCloseChain {
+
+        @Override
+        protected boolean consume(ClientHandler handler, Connector connector) {
+            synchronized (clientHandlerList) {
+                clientHandlerList.remove(handler);
+            }
+            // 移除群聊的客户端
+            Group group = groups.get(Foo.DEFAULT_GROUP_NAME);
+            group.removeMember(handler);
+            return true;
+        }
+    }
+
+
+    /**
+     * 解析收到的消息，当前节点主要做命令的解析，
+     * 如果子节点也未进行数据消费，那么则进行二次消费，直接返回收到的数据
+     */
+    private class ParseCommandConnectorStringPacketChain extends ConnectorStringPacketChain {
+        @Override
+        protected boolean consume(ClientHandler handler, StringReceivePacket stringReceivePacket) {
+            String str = stringReceivePacket.entity();
+            if (str.startsWith(Foo.COMMAND_GROUP_JOIN)) {
+                Group group = groups.get(Foo.DEFAULT_GROUP_NAME);
+                if (group.addMember(handler)) {
+                    sendMessageToClient(handler, "Join Group:" + group.getName());
+                }
+                return true;
+            } else if (str.startsWith(Foo.COMMAND_GROUP_LEAVE)) {
+                Group group = groups.get(Foo.DEFAULT_GROUP_NAME);
+                if (group.removeMember(handler)) {
+                    sendMessageToClient(handler, "Leave Group:" + group.getName());
+                }
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        protected boolean consumeAgain(ClientHandler handler, StringReceivePacket stringReceivePacket) {
+            // 捡漏的模式，当我们第一遍未消费，然后又没有加入到群，自然没有后续的节点消费
+            // 此时我们进行二次消费，返回发送过来的消息
+            sendMessageToClient(handler, stringReceivePacket.entity());
+            return true;
+        }
     }
 }
