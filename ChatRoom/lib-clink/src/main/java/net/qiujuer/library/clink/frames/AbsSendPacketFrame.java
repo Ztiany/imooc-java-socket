@@ -14,6 +14,15 @@ public abstract class AbsSendPacketFrame extends AbsSendFrame {
         this.packet = packet;
     }
 
+    /**
+     * 获取当前对应的发送Packet
+     *
+     * @return SendPacket
+     */
+    public synchronized SendPacket getPacket() {
+        return packet;
+    }
+
     @Override
     public synchronized boolean handle(IoArgs args) throws IOException {
         if (packet == null && !isSending()) {
