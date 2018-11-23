@@ -47,7 +47,9 @@ public class AsyncSendDispatcher implements SendDispatcher,
         if (queue.size() > 0) {
             return;
         }
-        reader.requestSendHeartbeatFrame();
+        if (reader.requestSendHeartbeatFrame()) {
+            requestSend();
+        }
     }
 
     /**
