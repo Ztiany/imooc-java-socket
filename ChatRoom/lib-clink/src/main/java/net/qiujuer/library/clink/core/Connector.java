@@ -1,6 +1,5 @@
 package net.qiujuer.library.clink.core;
 
-import net.qiujuer.library.clink.box.StringReceivePacket;
 import net.qiujuer.library.clink.box.StringSendPacket;
 import net.qiujuer.library.clink.impl.SocketChannelAdapter;
 import net.qiujuer.library.clink.impl.async.AsyncReceiveDispatcher;
@@ -61,13 +60,14 @@ public class Connector implements Closeable, SocketChannelAdapter.OnChannelStatu
     }
 
 
+    protected void onReceivePacket(ReceivePacket packet) {
+        System.out.println(key.toString() + ":[New Packet]-Type:" + packet.type() + ", Length:" + packet.length);
+    }
+
     private ReceiveDispatcher.ReceivePacketCallback receivePacketCallback = new ReceiveDispatcher.ReceivePacketCallback() {
         @Override
         public void onReceivePacketCompleted(ReceivePacket packet) {
-            if (packet instanceof StringReceivePacket) {
-                String msg = ((StringReceivePacket) packet).string();
-                onReceiveNewMessage(msg);
-            }
+            onReceivePacket(packet);
         }
     };
 
