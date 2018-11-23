@@ -4,10 +4,7 @@ import net.qiujuer.library.clink.core.Frame;
 import net.qiujuer.library.clink.core.IoArgs;
 import net.qiujuer.library.clink.core.SendPacket;
 import net.qiujuer.library.clink.core.ds.BytePriorityNode;
-import net.qiujuer.library.clink.frames.AbsSendPacketFrame;
-import net.qiujuer.library.clink.frames.CancelSendFrame;
-import net.qiujuer.library.clink.frames.SendEntityFrame;
-import net.qiujuer.library.clink.frames.SendHeaderFrame;
+import net.qiujuer.library.clink.frames.*;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -51,6 +48,26 @@ public class AsyncPacketReader implements Closeable {
 
         synchronized (this) {
             return nodeSize != 0;
+        }
+    }
+
+    /**
+     * 请求发送一份心跳帧，若当前心跳帧已存在则不重新添加到队列
+     *
+     * @return True 添加队列成功
+     */
+    boolean requestSendHeartbeatFrame() {
+        synchronized (this) {
+            for (BytePriorityNode<Frame> x = node; x != null; x = x.next) {
+                Frame frame = x.item;
+                if (frame.getBodyType() == Frame.TYPE_COMMAND_HEARTBEAT) {
+                    return false;
+                }
+            }
+
+            // 添加心跳帧
+            appendNewFrame(new HeartbeatSendFrame());
+            return true;
         }
     }
 

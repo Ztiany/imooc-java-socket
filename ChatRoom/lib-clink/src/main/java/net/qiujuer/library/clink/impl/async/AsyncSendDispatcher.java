@@ -40,6 +40,17 @@ public class AsyncSendDispatcher implements SendDispatcher,
     }
 
     /**
+     * 发送心跳帧，将心跳帧放到帧发送队列进行发送
+     */
+    @Override
+    public void sendHeartbeat() {
+        if (queue.size() > 0) {
+            return;
+        }
+        reader.requestSendHeartbeatFrame();
+    }
+
+    /**
      * 取消Packet操作
      * 如果还在队列中，代表Packet未进行发送，则直接标志取消，并返回即可
      * 如果未在队列中，则让reader尝试扫描当前发送序列，查询是否当前Packet正在发送

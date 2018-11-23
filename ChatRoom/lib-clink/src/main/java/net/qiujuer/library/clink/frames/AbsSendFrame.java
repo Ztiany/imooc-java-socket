@@ -11,9 +11,14 @@ public abstract class AbsSendFrame extends Frame {
     // 帧体可读写区域大小
     volatile int bodyRemaining;
 
-    public AbsSendFrame(int length, byte type, byte flag, short identifier) {
+    AbsSendFrame(int length, byte type, byte flag, short identifier) {
         super(length, type, flag, identifier);
         bodyRemaining = length;
+    }
+
+    public AbsSendFrame(byte[] header) {
+        super(header);
+        bodyRemaining = getBodyLength();
     }
 
     @Override

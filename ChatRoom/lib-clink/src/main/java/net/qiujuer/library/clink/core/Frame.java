@@ -20,6 +20,8 @@ public abstract class Frame {
     public static final byte TYPE_COMMAND_SEND_CANCEL = 41;
     // 指令-接受拒绝
     public static final byte TYPE_COMMAND_RECEIVE_REJECT = 42;
+    // 指令-心跳包
+    public static final byte TYPE_COMMAND_HEARTBEAT = 81;
 
     // Flag标记
     public static final byte FLAG_NONE = 0;
@@ -32,7 +34,7 @@ public abstract class Frame {
             throw new RuntimeException("The Body length of a single frame should be between 0 and " + MAX_CAPACITY);
         }
 
-        if (identifier < 1 || identifier > 255) {
+        if (type != TYPE_COMMAND_HEARTBEAT && (identifier < 1 || identifier > 255)) {
             throw new RuntimeException("The Body identifier of a single frame should be between 1 and 255");
         }
 

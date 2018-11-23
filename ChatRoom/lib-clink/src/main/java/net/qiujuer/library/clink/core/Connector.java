@@ -92,6 +92,11 @@ public abstract class Connector implements Closeable, SocketChannelAdapter.OnCha
         public void onReceivePacketCompleted(ReceivePacket packet) {
             onReceivedPacket(packet);
         }
+
+        @Override
+        public void onReceivedHeartbeat() {
+            System.out.println(key.toString() + ":[Heartbeat]");
+        }
     };
 
 

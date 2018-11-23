@@ -136,4 +136,12 @@ public class AsyncReceiveDispatcher implements ReceiveDispatcher,
         CloseUtils.close(packet);
         callback.onReceivePacketCompleted(packet);
     }
+
+    /**
+     * 当收到心跳包时直接往外抛出到Connector
+     */
+    @Override
+    public void onReceivedHeartbeat() {
+        callback.onReceivedHeartbeat();
+    }
 }
