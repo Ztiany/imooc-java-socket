@@ -51,7 +51,9 @@ public class Client {
         do {
             // 键盘读取一行
             String str = input.readLine();
-            if ("00bye00".equalsIgnoreCase(str)) {
+            if (str == null
+                    || str.length() == 0
+                    || "00bye00".equalsIgnoreCase(str)) {
                 break;
             }
 
