@@ -56,7 +56,7 @@ public class Client {
             }
 
             if (str.length() == 0) {
-                break;
+                continue;
             }
 
             // --f url

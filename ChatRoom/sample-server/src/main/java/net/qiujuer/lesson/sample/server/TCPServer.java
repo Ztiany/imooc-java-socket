@@ -150,7 +150,7 @@ public class TCPServer implements ServerAcceptor.AcceptListener,
             clientHandler.getCloseChain()
                     .appendLast(new RemoveQueueOnConnectorClosedChain());
 
-            synchronized (TCPServer.this) {
+            synchronized (clientHandlerList) {
                 clientHandlerList.add(clientHandler);
                 System.out.println("当前客户端数量：" + clientHandlerList.size());
             }
