@@ -94,4 +94,7 @@ public abstract class Connector implements Closeable, SocketChannelAdapter.OnCha
     };
 
 
+    public UUID getKey() {
+        return key;
+    }
 }
