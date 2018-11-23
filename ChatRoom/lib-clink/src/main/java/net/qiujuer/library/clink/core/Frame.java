@@ -38,7 +38,7 @@ public abstract class Frame {
 
         // 00000000 00000000 00000000 01000000
         header[0] = (byte) (length >> 8);
-        header[1] = (byte) (8);
+        header[1] = (byte) (length);
 
         header[2] = type;
         header[3] = flag;
