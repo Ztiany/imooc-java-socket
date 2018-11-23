@@ -30,16 +30,16 @@ public class IoSelectorProvider implements IoProvider {
     private final HashMap<SelectionKey, Runnable> inputCallbackMap = new HashMap<>();
     private final HashMap<SelectionKey, Runnable> outputCallbackMap = new HashMap<>();
 
-    private final ExecutorService inputHandlPool;
-    private final ExecutorService outputHandlPool;
+    private final ExecutorService inputHandlePool;
+    private final ExecutorService outputHandlePool;
 
     public IoSelectorProvider() throws IOException {
         readSelector = Selector.open();
         writeSelector = Selector.open();
 
-        inputHandlPool = Executors.newFixedThreadPool(4,
+        inputHandlePool = Executors.newFixedThreadPool(4,
                 new IoProviderThreadFactory("IoProvider-Input-Thread-"));
-        outputHandlPool = Executors.newFixedThreadPool(4,
+        outputHandlePool = Executors.newFixedThreadPool(4,
                 new IoProviderThreadFactory("IoProvider-Output-Thread-"));
 
         // 开始输出输入的监听
@@ -61,7 +61,7 @@ public class IoSelectorProvider implements IoProvider {
                         Set<SelectionKey> selectionKeys = readSelector.selectedKeys();
                         for (SelectionKey selectionKey : selectionKeys) {
                             if (selectionKey.isValid()) {
-                                handleSelection(selectionKey, SelectionKey.OP_READ, inputCallbackMap, inputHandlPool);
+                                handleSelection(selectionKey, SelectionKey.OP_READ, inputCallbackMap, inputHandlePool);
                             }
                         }
                         selectionKeys.clear();
@@ -91,7 +91,7 @@ public class IoSelectorProvider implements IoProvider {
                         Set<SelectionKey> selectionKeys = writeSelector.selectedKeys();
                         for (SelectionKey selectionKey : selectionKeys) {
                             if (selectionKey.isValid()) {
-                                handleSelection(selectionKey, SelectionKey.OP_WRITE, outputCallbackMap, outputHandlPool);
+                                handleSelection(selectionKey, SelectionKey.OP_WRITE, outputCallbackMap, outputHandlePool);
                             }
                         }
                         selectionKeys.clear();
@@ -131,8 +131,8 @@ public class IoSelectorProvider implements IoProvider {
     @Override
     public void close() {
         if (isClosed.compareAndSet(false, true)) {
-            inputHandlPool.shutdown();
-            outputHandlPool.shutdown();
+            inputHandlePool.shutdown();
+            outputHandlePool.shutdown();
 
             inputCallbackMap.clear();
             outputCallbackMap.clear();
