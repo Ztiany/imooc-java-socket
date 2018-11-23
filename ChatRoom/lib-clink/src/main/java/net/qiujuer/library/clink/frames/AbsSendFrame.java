@@ -6,8 +6,9 @@ import net.qiujuer.library.clink.core.IoArgs;
 import java.io.IOException;
 
 public abstract class AbsSendFrame extends Frame {
+    // 帧头可读写区域大小
     volatile byte headerRemaining = Frame.FRAME_HEADER_LENGTH;
-
+    // 帧体可读写区域大小
     volatile int bodyRemaining;
 
     public AbsSendFrame(int length, byte type, byte flag, short identifier) {
@@ -30,7 +31,6 @@ public abstract class AbsSendFrame extends Frame {
             }
 
             return headerRemaining == 0 && bodyRemaining == 0;
-
         } finally {
             args.finishWriting();
         }
