@@ -3,6 +3,7 @@ package net.qiujuer.lesson.sample.server;
 import net.qiujuer.lesson.sample.server.handle.ClientHandler;
 import net.qiujuer.library.clink.utils.CloseUtils;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
@@ -17,14 +18,16 @@ import java.util.concurrent.Executors;
 
 public class TCPServer implements ClientHandler.ClientHandlerCallback {
     private final int port;
+    private final File cachePath;
+    private final ExecutorService forwardingThreadPoolExecutor;
     private ClientListener listener;
     private List<ClientHandler> clientHandlerList = new ArrayList<>();
-    private final ExecutorService forwardingThreadPoolExecutor;
     private Selector selector;
     private ServerSocketChannel server;
 
-    public TCPServer(int port) {
+    public TCPServer(int port, File cachePath) {
         this.port = port;
+        this.cachePath = cachePath;
         // 转发线程池
         this.forwardingThreadPoolExecutor = Executors.newSingleThreadExecutor();
     }
@@ -140,7 +143,8 @@ public class TCPServer implements ClientHandler.ClientHandlerCallback {
 
                             try {
                                 // 客户端构建异步线程
-                                ClientHandler clientHandler = new ClientHandler(socketChannel, TCPServer.this);
+                                ClientHandler clientHandler = new ClientHandler(socketChannel,
+                                        TCPServer.this, cachePath);
                                 // 添加同步处理
                                 synchronized (TCPServer.this) {
                                     clientHandlerList.add(clientHandler);

@@ -1,19 +1,26 @@
 package net.qiujuer.lesson.sample.server.handle;
 
 
+import net.qiujuer.lesson.sample.foo.Foo;
 import net.qiujuer.library.clink.core.Connector;
+import net.qiujuer.library.clink.core.Packet;
+import net.qiujuer.library.clink.core.ReceivePacket;
 import net.qiujuer.library.clink.utils.CloseUtils;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
 
 public class ClientHandler extends Connector {
+    private final File cachePath;
     private final ClientHandlerCallback clientHandlerCallback;
     private final String clientInfo;
 
-    public ClientHandler(SocketChannel socketChannel, ClientHandlerCallback clientHandlerCallback) throws IOException {
+    public ClientHandler(SocketChannel socketChannel, ClientHandlerCallback clientHandlerCallback, File cachePath) throws IOException {
         this.clientHandlerCallback = clientHandlerCallback;
         this.clientInfo = socketChannel.getRemoteAddress().toString();
+        this.cachePath = cachePath;
+
 
         System.out.println("新客户端连接：" + clientInfo);
 
@@ -31,15 +38,24 @@ public class ClientHandler extends Connector {
         exitBySelf();
     }
 
-    private void exitBySelf() {
-        exit();
-        clientHandlerCallback.onSelfClosed(this);
+    @Override
+    protected File createNewReceiveFile() {
+        return Foo.createRandomTemp(cachePath);
     }
 
     @Override
-    protected void onReceiveNewMessage(String str) {
-        super.onReceiveNewMessage(str);
-        clientHandlerCallback.onNewMessageArrived(this, str);
+    protected void onReceivedPacket(ReceivePacket packet) {
+        super.onReceivedPacket(packet);
+        if (packet.type() == Packet.TYPE_MEMORY_STRING) {
+            String string = (String) packet.entity();
+            System.out.println(key.toString() + ":" + string);
+            clientHandlerCallback.onNewMessageArrived(this, string);
+        }
+    }
+
+    private void exitBySelf() {
+        exit();
+        clientHandlerCallback.onSelfClosed(this);
     }
 
     public interface ClientHandlerCallback {
