@@ -1,0 +1,2 @@
+* IoSelectorProvider Selector、Channel、SelectionKey之间的并发锁死等待BUG
+* IoSelectorProvider Selector、Channel、SelectionKey已关闭的异常捕获
