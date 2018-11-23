@@ -47,7 +47,7 @@ public class AsyncReceiveDispatcher implements ReceiveDispatcher,
      * 关闭操作，关闭相关流
      */
     @Override
-    public void close() throws IOException {
+    public void close() {
         if (isClosed.compareAndSet(false, true)) {
             writer.close();
         }

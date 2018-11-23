@@ -115,4 +115,6 @@ public abstract class Frame {
      */
     public abstract Frame nextFrame();
     // 64MB 64KB 1024+1 6
+
+    public abstract int getConsumableLength();
 }

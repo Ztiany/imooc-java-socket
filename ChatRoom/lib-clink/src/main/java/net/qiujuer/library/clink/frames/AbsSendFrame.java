@@ -36,6 +36,11 @@ public abstract class AbsSendFrame extends Frame {
         }
     }
 
+    @Override
+    public int getConsumableLength() {
+        return headerRemaining + bodyRemaining;
+    }
+
     private byte consumeHeader(IoArgs args) {
         int count = headerRemaining;
         int offset = header.length - count;

@@ -146,6 +146,18 @@ public class IoArgs {
         return fillSize;
     }
 
+    /**
+     * 清空部分数据
+     *
+     * @param size 想要清空的数据长度
+     * @return 真实清空的数据长度
+     */
+    public int setEmpty(int size) {
+        int emptySize = Math.min(size, buffer.remaining());
+        buffer.position(buffer.position() + emptySize);
+        return emptySize;
+    }
+
 
     /**
      * IoArgs 提供者、处理者；数据的生产或消费者

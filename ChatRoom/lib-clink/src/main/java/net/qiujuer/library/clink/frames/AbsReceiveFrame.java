@@ -9,7 +9,7 @@ public abstract class AbsReceiveFrame extends Frame {
     // 帧体可读写区域大小
     volatile int bodyRemaining;
 
-    public AbsReceiveFrame(byte[] header) {
+    AbsReceiveFrame(byte[] header) {
         super(header);
         bodyRemaining = getBodyLength();
     }
@@ -29,6 +29,11 @@ public abstract class AbsReceiveFrame extends Frame {
     @Override
     public final Frame nextFrame() {
         return null;
+    }
+
+    @Override
+    public int getConsumableLength() {
+        return bodyRemaining;
     }
 
     protected abstract int consumeBody(IoArgs args) throws IOException;
