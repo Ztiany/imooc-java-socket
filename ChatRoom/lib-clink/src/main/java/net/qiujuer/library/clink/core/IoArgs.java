@@ -67,18 +67,23 @@ public class IoArgs {
      * 从SocketChannel读取数据
      */
     public int readFrom(SocketChannel channel) throws IOException {
-        startWriting();
-
+        ByteBuffer buffer = this.buffer;
         int bytesProduced = 0;
-        while (buffer.hasRemaining()) {
-            int len = channel.read(buffer);
+        int len;
+
+        // 读取或写数据到Socket原理
+        // 回调当前可读、可写时我们进行数据填充或者消费
+        // 但是过程中可能SocketChannel资源被其他SocketChannel占用了资源
+        // 那么我们应该让出当前的线程调度，让应该得到数据消费的SocketChannel的到CPU调度
+        // 而不应该单纯的buffer.hasRemaining()判断
+        do {
+            len = channel.read(buffer);
             if (len < 0) {
-                throw new EOFException();
+                throw new EOFException("Cannot read any data with:" + channel);
             }
             bytesProduced += len;
-        }
+        } while (buffer.hasRemaining() && len != 0);
 
-        finishWriting();
         return bytesProduced;
     }
 
@@ -86,14 +91,23 @@ public class IoArgs {
      * 写数据到SocketChannel
      */
     public int writeTo(SocketChannel channel) throws IOException {
+        ByteBuffer buffer = this.buffer;
         int bytesProduced = 0;
-        while (buffer.hasRemaining()) {
-            int len = channel.write(buffer);
+        int len;
+
+        // 读取或写数据到Socket原理
+        // 回调当前可读、可写时我们进行数据填充或者消费
+        // 但是过程中可能SocketChannel资源被其他SocketChannel占用了资源
+        // 那么我们应该让出当前的线程调度，让应该得到数据消费的SocketChannel的到CPU调度
+        // 而不应该单纯的buffer.hasRemaining()判断
+        do {
+            len = channel.write(buffer);
             if (len < 0) {
-                throw new EOFException();
+                throw new EOFException("Current write any data with:" + channel);
             }
             bytesProduced += len;
-        }
+        } while (buffer.hasRemaining() && len != 0);
+
         return bytesProduced;
     }
 
