@@ -43,4 +43,14 @@ public abstract class AbsSendFrame extends Frame {
     }
 
     protected abstract int consumeBody(IoArgs args) throws IOException;
+
+    /**
+     * 是否已经处于发送数据中，如果已经发送了部分数据则返回True
+     * 只要头部数据已经开始消费，则肯定已经处于发送数据中
+     *
+     * @return True，已发送部分数据
+     */
+    protected synchronized boolean isSending() {
+        return headerRemaining < Frame.FRAME_HEADER_LENGTH;
+    }
 }
