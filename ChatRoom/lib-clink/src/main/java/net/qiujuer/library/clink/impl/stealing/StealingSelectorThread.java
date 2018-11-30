@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * PS：可窃取任务的线程
@@ -27,11 +28,47 @@ public abstract class StealingSelectorThread extends Thread {
     private final LinkedBlockingQueue<IoTask> registerTaskQueue = new LinkedBlockingQueue<>();
     // 单次就绪的任务缓存，随后一次性加入到就绪队列中
     private final List<IoTask> onceReadyTaskCache = new ArrayList<>(200);
-
+    // 任务饱和度度量
+    private final AtomicLong saturatingCapacity = new AtomicLong();
+    // 用于多线程协同的Service
+    private volatile StealingService stealingService;
 
     public StealingSelectorThread(Selector selector) {
         this.selector = selector;
     }
+
+    /**
+     * 绑定StealingService
+     *
+     * @param stealingService StealingService
+     */
+    public void setStealingService(StealingService stealingService) {
+        this.stealingService = stealingService;
+    }
+
+    /**
+     * 获取内部的任务队列
+     *
+     * @return 任务队列
+     */
+    LinkedBlockingQueue<IoTask> getReadyTaskQueue() {
+        return readyTaskQueue;
+    }
+
+    /**
+     * 获取饱和程度
+     * 暂时的饱和度量是使用任务执行的次数来定
+     *
+     * @return -1 已失效
+     */
+    long getSaturatingCapacity() {
+        if (selector.isOpen()) {
+            return saturatingCapacity.get();
+        } else {
+            return -1;
+        }
+    }
+
 
     /**
      * 将通道注册到当前的Selector中
@@ -119,15 +156,20 @@ public abstract class StealingSelectorThread extends Thread {
      */
     private void joinTaskQueue(final LinkedBlockingQueue<IoTask> readyTaskQueue, final List<IoTask> onceReadyTaskCache) {
         readyTaskQueue.addAll(onceReadyTaskCache);
+        // TODO 通知 StealingService 任务数量改变了，可以做一定的排序操作
     }
 
     /**
      * 消费待完成的任务
      */
     private void consumeTodoTasks(final LinkedBlockingQueue<IoTask> readyTaskQueue, LinkedBlockingQueue<IoTask> registerTaskQueue) {
+        final AtomicLong saturatingCapacity = this.saturatingCapacity;
+
         // 循环把所有任务做完
         IoTask doTask = readyTaskQueue.poll();
         while (doTask != null) {
+            // 增加饱和度
+            saturatingCapacity.incrementAndGet();
             // 做任务
             if (processTask(doTask)) {
                 // 做完工作后添加待注册的列表
@@ -135,6 +177,19 @@ public abstract class StealingSelectorThread extends Thread {
             }
             // 下个任务
             doTask = readyTaskQueue.poll();
+        }
+
+        // 窃取其他的任务
+        final StealingService stealingService = this.stealingService;
+        if (stealingService != null) {
+            doTask = stealingService.steal(readyTaskQueue);
+            while (doTask != null) {
+                saturatingCapacity.incrementAndGet();
+                if (processTask(doTask)) {
+                    registerTaskQueue.offer(doTask);
+                }
+                doTask = stealingService.steal(readyTaskQueue);
+            }
         }
     }
 
