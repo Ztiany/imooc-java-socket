@@ -11,7 +11,7 @@ public class SchedulerImpl implements Scheduler {
     public SchedulerImpl(int poolSize) {
         this.scheduledExecutorService = Executors.newScheduledThreadPool(poolSize,
                 new NameableThreadFactory("Scheduler-Thread-"));
-        this.deliveryPool = Executors.newFixedThreadPool(1,
+        this.deliveryPool = Executors.newFixedThreadPool(4,
                 new NameableThreadFactory("Delivery-Thread-"));
     }
 

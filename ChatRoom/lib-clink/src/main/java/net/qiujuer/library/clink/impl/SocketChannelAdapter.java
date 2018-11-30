@@ -66,7 +66,10 @@ public class SocketChannelAdapter implements Sender, Receiver, Cloneable {
         // 进行Callback状态监测，判断是否处于自循环状态
         outputCallback.checkAttachNull();
         // 当前发送的数据附加到回调中
-        return ioProvider.registerOutput(channel, outputCallback);
+        // ioProvider.registerOutput(channel, outputCallback);
+
+        outputCallback.run();
+        return true;
     }
 
     @Override
