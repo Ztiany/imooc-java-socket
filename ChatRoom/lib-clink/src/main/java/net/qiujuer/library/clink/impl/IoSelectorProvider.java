@@ -59,26 +59,24 @@ public class IoSelectorProvider implements IoProvider {
         thread.start();
     }
 
-
     @Override
-    public boolean registerInput(SocketChannel channel, HandleProviderCallback callback) {
-        return registerSelection(channel, readSelector, SelectionKey.OP_READ, inRegInput,
-                inputCallbackMap, callback) != null;
+    public void register(HandleProviderCallback callback) throws Exception {
+        SelectionKey key;
+        if (callback.ops == SelectionKey.OP_READ) {
+            key = registerSelection(callback.channel, readSelector, SelectionKey.OP_READ, inRegInput,
+                    inputCallbackMap, callback);
+        } else {
+            key = registerSelection(callback.channel, writeSelector, SelectionKey.OP_WRITE, inRegOutput,
+                    outputCallbackMap, callback);
+        }
+        if (key == null) {
+            throw new IOException("Register error: channel:" + callback.channel + " ops:" + callback.ops);
+        }
     }
 
     @Override
-    public boolean registerOutput(SocketChannel channel, HandleProviderCallback callback) {
-        return registerSelection(channel, writeSelector, SelectionKey.OP_WRITE, inRegOutput,
-                outputCallbackMap, callback) != null;
-    }
-
-    @Override
-    public void unRegisterInput(SocketChannel channel) {
+    public void unregister(SocketChannel channel) {
         unRegisterSelection(channel, readSelector, inputCallbackMap, inRegInput);
-    }
-
-    @Override
-    public void unRegisterOutput(SocketChannel channel) {
         unRegisterSelection(channel, writeSelector, outputCallbackMap, inRegOutput);
     }
 
@@ -208,7 +206,6 @@ public class IoSelectorProvider implements IoProvider {
             pool.execute(runnable);
         }
     }
-
 
     static class SelectThread extends Thread {
         private final AtomicBoolean isClosed;

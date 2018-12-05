@@ -6,7 +6,6 @@ import net.qiujuer.library.clink.impl.stealing.StealingSelectorThread;
 import net.qiujuer.library.clink.impl.stealing.StealingService;
 
 import java.io.IOException;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 
@@ -27,6 +26,8 @@ public class IoStealingSelectorProvider implements IoProvider {
         StealingService stealingService = new StealingService(threads, 10);
         for (IoStealingThread thread : threads) {
             thread.setStealingService(stealingService);
+            thread.setDaemon(false);
+            thread.setPriority(Thread.MAX_PRIORITY);
             thread.start();
         }
 
@@ -34,34 +35,24 @@ public class IoStealingSelectorProvider implements IoProvider {
         this.stealingService = stealingService;
     }
 
-
     @Override
-    public boolean registerInput(SocketChannel channel, HandleProviderCallback callback) {
+    public void register(HandleProviderCallback callback) throws Exception {
         StealingSelectorThread thread = stealingService.getNotBusyThread();
-        if (thread != null) {
-            return thread.register(channel, SelectionKey.OP_READ, callback);
+        if (thread == null) {
+            throw new IOException("IoStealingSelectorProvider is shutdown!");
         }
-        return false;
+        thread.register(callback);
     }
 
     @Override
-    public boolean registerOutput(SocketChannel channel, HandleProviderCallback callback) {
-        StealingSelectorThread thread = stealingService.getNotBusyThread();
-        if (thread != null) {
-            return thread.register(channel, SelectionKey.OP_WRITE, callback);
+    public void unregister(SocketChannel channel) {
+        if (!channel.isOpen()) {
+            // 已关闭，无需解除注册
+            return;
         }
-        return false;
-    }
-
-    @Override
-    public void unRegisterInput(SocketChannel channel) {
         for (IoStealingThread thread : threads) {
             thread.unregister(channel);
         }
-    }
-
-    @Override
-    public void unRegisterOutput(SocketChannel channel) {
     }
 
     @Override
@@ -77,8 +68,7 @@ public class IoStealingSelectorProvider implements IoProvider {
 
         @Override
         protected boolean processTask(IoTask task) {
-            task.providerCallback.run();
-            return false;
+            return task.onProcessIo();
         }
     }
 }

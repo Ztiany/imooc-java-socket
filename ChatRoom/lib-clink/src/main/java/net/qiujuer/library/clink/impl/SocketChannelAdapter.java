@@ -25,9 +25,6 @@ public class SocketChannelAdapter implements Sender, Receiver, Cloneable {
         this.channel = channel;
         this.ioProvider = ioProvider;
         this.listener = listener;
-
-        channel.configureBlocking(false);
-
         this.inputCallback = new InputProviderCallback(ioProvider, channel, SelectionKey.OP_READ);
         this.outputCallback = new OutputProviderCallback(ioProvider, channel, SelectionKey.OP_WRITE);
     }
