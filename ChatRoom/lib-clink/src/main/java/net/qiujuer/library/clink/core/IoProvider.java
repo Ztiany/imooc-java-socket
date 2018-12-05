@@ -4,24 +4,40 @@ import java.io.Closeable;
 import java.nio.channels.SocketChannel;
 
 public interface IoProvider extends Closeable {
-    boolean registerInput(SocketChannel channel, HandleProviderCallback callback);
+    void register(HandleProviderCallback callback) throws Exception;
 
-    boolean registerOutput(SocketChannel channel, HandleProviderCallback callback);
+    void unregister(SocketChannel channel);
 
-    void unRegisterInput(SocketChannel channel);
-
-    void unRegisterOutput(SocketChannel channel);
-
-
-    abstract class HandleProviderCallback implements Runnable {
+    abstract class HandleProviderCallback extends IoTask implements Runnable {
+        private final IoProvider ioProvider;
         /**
          * 附加本次未完全消费完成的IoArgs，然后进行自循环
          */
         protected volatile IoArgs attach;
 
+        protected HandleProviderCallback(IoProvider provider, SocketChannel channel, int ops) {
+            super(channel, ops);
+            this.ioProvider = provider;
+        }
+
         @Override
         public final void run() {
-            onProviderIo(attach);
+            final IoArgs attach = this.attach;
+            this.attach = null;
+            if (onProvideIo(attach)) {
+                try {
+                    ioProvider.register(this);
+                } catch (Exception e) {
+                    fireThrowable(e);
+                }
+            }
+        }
+
+        @Override
+        public final boolean onProcessIo() {
+            final IoArgs attach = this.attach;
+            this.attach = null;
+            return onProvideIo(attach);
         }
 
         /**
@@ -29,7 +45,7 @@ public interface IoProvider extends Closeable {
          *
          * @param args 携带之前的附加值
          */
-        protected abstract void onProviderIo(IoArgs args);
+        protected abstract boolean onProvideIo(IoArgs args);
 
         /**
          * 检查当前的附加值是否未null，如果处于自循环时当前附加值不为null，
@@ -41,5 +57,4 @@ public interface IoProvider extends Closeable {
             }
         }
     }
-
 }

@@ -1,6 +1,7 @@
 package net.qiujuer.library.clink.impl.stealing;
 
 import net.qiujuer.library.clink.core.IoProvider;
+import net.qiujuer.library.clink.core.IoTask;
 import net.qiujuer.library.clink.utils.CloseUtils;
 
 import java.io.IOException;

@@ -1,5 +1,7 @@
 package net.qiujuer.library.clink.impl.stealing;
 
+import net.qiujuer.library.clink.core.IoTask;
+
 import java.util.Arrays;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.IntFunction;

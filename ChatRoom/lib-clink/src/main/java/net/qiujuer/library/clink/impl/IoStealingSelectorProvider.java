@@ -1,7 +1,7 @@
 package net.qiujuer.library.clink.impl;
 
 import net.qiujuer.library.clink.core.IoProvider;
-import net.qiujuer.library.clink.impl.stealing.IoTask;
+import net.qiujuer.library.clink.core.IoTask;
 import net.qiujuer.library.clink.impl.stealing.StealingSelectorThread;
 import net.qiujuer.library.clink.impl.stealing.StealingService;
 
