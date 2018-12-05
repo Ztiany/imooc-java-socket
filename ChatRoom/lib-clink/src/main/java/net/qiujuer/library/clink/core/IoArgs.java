@@ -227,16 +227,17 @@ public class IoArgs {
         /**
          * 消费失败时回调
          *
-         * @param args IoArgs
-         * @param e    异常信息
+         * @param e 异常信息
+         * @return 是否关闭链接，True关闭
          */
-        void onConsumeFailed(IoArgs args, Exception e);
+        boolean onConsumeFailed(Throwable e);
 
         /**
          * 消费成功
          *
          * @param args IoArgs
+         * @return True:直接注册下一份调度，False:无需注册
          */
-        void onConsumeCompleted(IoArgs args);
+        boolean onConsumeCompleted(IoArgs args);
     }
 }

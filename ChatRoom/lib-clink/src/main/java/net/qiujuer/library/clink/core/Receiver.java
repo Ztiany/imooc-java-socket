@@ -6,7 +6,12 @@ import java.io.IOException;
 public interface Receiver extends Closeable {
     void setReceiveListener(IoArgs.IoArgsEventProcessor processor);
 
-    boolean postReceiveAsync() throws IOException;
+    /**
+     * 注册失败则抛出异常
+     *
+     * @throws Exception 异常信息
+     */
+    void postReceiveAsync() throws Exception;
 
     /**
      * 获取读取数据的时间
