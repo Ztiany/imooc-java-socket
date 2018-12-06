@@ -1,6 +1,7 @@
 package net.qiujuer.library.clink.impl.bridge;
 
 import net.qiujuer.library.clink.core.*;
+import net.qiujuer.library.clink.impl.exceptions.EmptyIoArgsException;
 import net.qiujuer.library.clink.utils.plugin.CircularByteBuffer;
 
 import java.io.IOException;
@@ -76,6 +77,7 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
     @Override
     public void stop() {
         // nothing
+        receiver.setReceiveListener(null);
     }
 
     @Override
@@ -104,7 +106,7 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
     private void registerReceive() {
         try {
             receiver.postReceiveAsync();
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -114,21 +116,23 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
      */
     private void requestSend() {
         synchronized (isSending) {
+            final AtomicBoolean isRegisterSending = isSending;
             final Sender sender = this.sender;
-            if (isSending.get() || sender == null) {
+            if (isRegisterSending.get() || sender == null) {
                 return;
             }
 
             // 返回True代表当前有数据需要发送
             if (mBuffer.getAvailable() > 0) {
                 try {
-                    boolean isSucceed = sender.postSendAsync();
-                    if (isSucceed) {
-                        isSending.set(true);
-                    }
-                } catch (IOException e) {
+                    isRegisterSending.set(true);
+                    sender.postSendAsync();
+                } catch (Exception e) {
                     e.printStackTrace();
+                    isRegisterSending.set(false);
                 }
+            } else {
+                isRegisterSending.set(false);
             }
         }
     }
@@ -146,21 +150,26 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
         }
 
         @Override
-        public void onConsumeFailed(IoArgs args, Exception e) {
-            e.printStackTrace();
+        public boolean onConsumeFailed(Throwable e) {
+            // args 不可能为null，错误信息直接打印，并且关闭流程
+            new RuntimeException(e).printStackTrace();
+            return true;
         }
 
         @Override
-        public void onConsumeCompleted(IoArgs args) {
+        public boolean onConsumeCompleted(IoArgs args) {
             args.finishWriting();
             try {
                 args.writeTo(writableByteChannel);
+                // 接收数据后请求发送数据
+                requestSend();
+                // 继续接收数据
+                return true;
             } catch (IOException e) {
                 e.printStackTrace();
+                // 不再接收
+                return false;
             }
-            registerReceive();
-            // 接收数据后请求发送数据
-            requestSend();
         }
     };
 
@@ -187,25 +196,37 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
             return null;
         }
 
+        @SuppressWarnings("Duplicates")
         @Override
-        public void onConsumeFailed(IoArgs args, Exception e) {
-            e.printStackTrace();
-            // 设置当前发送状态
-            synchronized (isSending) {
-                isSending.set(false);
+        public boolean onConsumeFailed(Throwable e) {
+            if (e instanceof EmptyIoArgsException) {
+                // 设置当前发送状态
+                synchronized (isSending) {
+                    isSending.set(false);
+                    // 继续请求发送当前的数据
+                    requestSend();
+                }
+                // 无需关闭链接
+                return false;
+            } else {
+                // 关闭链接
+                return true;
             }
-            // 继续请求发送当前的数据
-            requestSend();
         }
 
         @Override
-        public void onConsumeCompleted(IoArgs args) {
-            // 设置当前发送状态
-            synchronized (isSending) {
-                isSending.set(false);
+        public boolean onConsumeCompleted(IoArgs args) {
+            if (mBuffer.getAvailable() > 0) {
+                return true;
+            } else {
+                // 设置当前发送状态
+                synchronized (isSending) {
+                    isSending.set(false);
+                    // 继续请求发送当前的数据
+                    requestSend();
+                }
+                return false;
             }
-            // 继续请求发送当前的数据
-            requestSend();
         }
     };
 }
