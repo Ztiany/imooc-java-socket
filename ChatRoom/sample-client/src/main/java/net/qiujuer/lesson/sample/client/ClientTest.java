@@ -102,7 +102,8 @@ public class ClientTest {
         done = true;
 
         // 客户端结束操作
-        for (TCPClient tcpClient : tcpClients) {
+        TCPClient[] copyClients = tcpClients.toArray(new TCPClient[0]);
+        for (TCPClient tcpClient : copyClients) {
             tcpClient.exit();
         }
 

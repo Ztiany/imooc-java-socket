@@ -19,7 +19,7 @@ public class AsyncReceiveDispatcher implements ReceiveDispatcher,
     private final Receiver receiver;
     private final ReceivePacketCallback callback;
 
-    private AsyncPacketWriter writer = new AsyncPacketWriter(this);
+    private final AsyncPacketWriter writer = new AsyncPacketWriter(this);
 
     public AsyncReceiveDispatcher(Receiver receiver, ReceivePacketCallback callback) {
         this.receiver = receiver;
@@ -40,7 +40,7 @@ public class AsyncReceiveDispatcher implements ReceiveDispatcher,
      */
     @Override
     public void stop() {
-
+        receiver.setReceiveListener(null);
     }
 
     /**
@@ -50,14 +50,8 @@ public class AsyncReceiveDispatcher implements ReceiveDispatcher,
     public void close() {
         if (isClosed.compareAndSet(false, true)) {
             writer.close();
+            receiver.setReceiveListener(null);
         }
-    }
-
-    /**
-     * 自主发起的关闭操作，并且需要进行通知
-     */
-    private void closeAndNotify() {
-        CloseUtils.close(this);
     }
 
     /**
@@ -66,8 +60,8 @@ public class AsyncReceiveDispatcher implements ReceiveDispatcher,
     private void registerReceive() {
         try {
             receiver.postReceiveAsync();
-        } catch (IOException e) {
-            closeAndNotify();
+        } catch (Exception e) {
+            CloseUtils.close(this);
         }
     }
 
@@ -87,12 +81,13 @@ public class AsyncReceiveDispatcher implements ReceiveDispatcher,
     /**
      * 接收数据失败
      *
-     * @param args IoArgs
-     * @param e    异常信息
+     * @param e 异常信息
      */
     @Override
-    public void onConsumeFailed(IoArgs args, Exception e) {
-        e.printStackTrace();
+    public boolean onConsumeFailed(Throwable e) {
+        // args 不会为null，当出现异常时，需要关闭链接
+        CloseUtils.close(this);
+        return true;
     }
 
     /**
@@ -101,10 +96,9 @@ public class AsyncReceiveDispatcher implements ReceiveDispatcher,
      * @param args IoArgs
      */
     @Override
-    public void onConsumeCompleted(IoArgs args) {
-        if (isClosed.get()) {
-            return;
-        }
+    public boolean onConsumeCompleted(IoArgs args) {
+        final AtomicBoolean isClosed = this.isClosed;
+        final AsyncPacketWriter writer = this.writer;
 
         // 消费数据之前标示args数据填充完成，
         // 改变未可读取数据状态
@@ -114,7 +108,9 @@ public class AsyncReceiveDispatcher implements ReceiveDispatcher,
         do {
             writer.consumeIoArgs(args);
         } while (args.remained() && !isClosed.get());
-        registerReceive();
+
+        // 如果没有关闭则直接注册下一次监听
+        return !isClosed.get();
     }
 
     /**
