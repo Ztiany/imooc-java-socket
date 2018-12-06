@@ -4,17 +4,18 @@ import net.qiujuer.library.clink.core.IoArgs;
 import net.qiujuer.library.clink.core.SendDispatcher;
 import net.qiujuer.library.clink.core.SendPacket;
 import net.qiujuer.library.clink.core.Sender;
+import net.qiujuer.library.clink.impl.exceptions.EmptyIoArgsException;
 import net.qiujuer.library.clink.utils.CloseUtils;
 
-import java.io.IOException;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AsyncSendDispatcher implements SendDispatcher,
         IoArgs.IoArgsEventProcessor, AsyncPacketReader.PacketProvider {
     private final Sender sender;
-    private final Queue<SendPacket> queue = new ConcurrentLinkedQueue<>();
+    // 阻塞队列，默认等待任务数量设定为16个；超过16个添加任务将被阻塞等待
+    private final BlockingQueue<SendPacket> queue = new ArrayBlockingQueue<>(16);
     private final AtomicBoolean isSending = new AtomicBoolean();
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
     private final AsyncPacketReader reader = new AsyncPacketReader(this);
@@ -35,8 +36,11 @@ public class AsyncSendDispatcher implements SendDispatcher,
      */
     @Override
     public void send(SendPacket packet) {
-        queue.offer(packet);
-        requestSend();
+        try {
+            queue.put(packet);
+            requestSend(false);
+        } catch (InterruptedException ignored) {
+        }
     }
 
     /**
@@ -44,11 +48,11 @@ public class AsyncSendDispatcher implements SendDispatcher,
      */
     @Override
     public void sendHeartbeat() {
-        if (queue.size() > 0) {
+        if (!queue.isEmpty()) {
             return;
         }
         if (reader.requestSendHeartbeatFrame()) {
-            requestSend();
+            requestSend(false);
         }
     }
 
@@ -103,32 +107,37 @@ public class AsyncSendDispatcher implements SendDispatcher,
     /**
      * 请求网络进行数据发送
      */
-    private void requestSend() {
+    private void requestSend(boolean callFromIoConsume) {
         synchronized (isSending) {
-            if (isSending.get() || isClosed.get()) {
+            final AtomicBoolean isRegisterSending = isSending;
+            final boolean oldState = isRegisterSending.get();
+            if (isClosed.get() || (oldState && !callFromIoConsume)) {
+                // 已关闭
+                // 从非IO流程调用需检测是否已注册
                 return;
+            }
+
+            // 从IO流程调用时，当前状态应处于发送中才对
+            if (callFromIoConsume && !oldState) {
+                throw new IllegalStateException("Call from IoConsume, current state should in sending!");
             }
 
             // 返回True代表当前有数据需要发送
             if (reader.requestTakePacket()) {
+                // 预先设置，防止调用 sender.postSendAsync() 可能会触发递归流程
+                isRegisterSending.set(true);
                 try {
-                    isSending.set(true);
-                    boolean isSucceed = sender.postSendAsync();
-                    if (!isSucceed) {
-                        isSending.set(false);
-                    }
-                } catch (IOException e) {
-                    closeAndNotify();
+                    // 真实注册
+                    sender.postSendAsync();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    CloseUtils.close(this);
                 }
+            } else {
+                // 无需注册时，设置未在发送中
+                isRegisterSending.set(false);
             }
         }
-    }
-
-    /**
-     * 请求网络发送异常时触发，进行关闭操作
-     */
-    private void closeAndNotify() {
-        CloseUtils.close(this);
     }
 
     /**
@@ -162,18 +171,19 @@ public class AsyncSendDispatcher implements SendDispatcher,
     /**
      * 网络发送IoArgs出现异常
      *
-     * @param args IoArgs
-     * @param e    异常信息
+     * @param e 异常信息
      */
     @Override
-    public void onConsumeFailed(IoArgs args, Exception e) {
-        e.printStackTrace();
-        // 设置当前发送状态
-        synchronized (isSending) {
-            isSending.set(false);
+    public boolean onConsumeFailed(Throwable e) {
+        if (e instanceof EmptyIoArgsException) {
+            // args为null异常，此时直接进行对应检查即可
+            requestSend(true);
+            return false;
+        } else {
+            // 其他异常信息，直接中断流程
+            CloseUtils.close(this);
+            return true;
         }
-        // 继续请求发送当前的数据
-        requestSend();
     }
 
     /**
@@ -183,12 +193,20 @@ public class AsyncSendDispatcher implements SendDispatcher,
      * @param args IoArgs
      */
     @Override
-    public void onConsumeCompleted(IoArgs args) {
-        // 设置当前发送状态
+    public boolean onConsumeCompleted(IoArgs args) {
         synchronized (isSending) {
-            isSending.set(false);
+            AtomicBoolean isRegisterSending = isSending;
+            final boolean isRunning = !isClosed.get();
+            // 从IO流程调用时，当前状态应处于发送中才对
+            if (!isRegisterSending.get() && isRunning) {
+                throw new IllegalStateException("Call from IoConsume, current state should in sending!");
+            }
+
+            // 设置新状态
+            isRegisterSending.set(isRunning && reader.requestTakePacket());
+
+            // 返回状态
+            return isRegisterSending.get();
         }
-        // 继续请求发送当前的数据
-        requestSend();
     }
 }
