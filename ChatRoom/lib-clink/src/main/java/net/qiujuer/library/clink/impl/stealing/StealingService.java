@@ -5,7 +5,6 @@ import net.qiujuer.library.clink.core.IoTask;
 import java.util.Arrays;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.IntFunction;
 
 /**
@@ -34,6 +33,21 @@ public class StealingService {
         this.queues = Arrays.stream(threads)
                 .map(StealingSelectorThread::getReadyTaskQueue)
                 .toArray((IntFunction<Queue<IoTask>[]>) ArrayBlockingQueue[]::new);
+
+        /*
+        // 另外一种写法
+        // 本质来说他就是数组，数组类型是ArrayBlockingQueue
+        // 为什么是ArrayBlockingQueue，因为StealingSelectorThread#getReadyTaskQueue得到的就是一个ArrayBlockingQueue
+        this.queues = new ArrayBlockingQueue[threads.length];
+
+        // 循环线程，去拿到内部的队列
+        for (int i = 0; i < threads.length; i++) {
+            // readyTaskQueue 本质就是一个 ArrayBlockingQueue<IoTask>
+            Queue<IoTask> readyTaskQueue = threads[i].getReadyTaskQueue();
+            // 这里直接赋值给数组的值就好
+            queues[i] = readyTaskQueue;
+        }
+        */
     }
 
     /**
