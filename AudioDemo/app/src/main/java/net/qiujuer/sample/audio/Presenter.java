@@ -2,19 +2,20 @@ package net.qiujuer.sample.audio;
 
 import net.qiujuer.genius.kit.handler.Run;
 import net.qiujuer.genius.kit.handler.runable.Action;
-import net.qiujuer.library.clink.box.StreamDirectSendPacket;
 import net.qiujuer.library.clink.core.Connector;
 import net.qiujuer.library.clink.core.IoContext;
 import net.qiujuer.library.clink.impl.IoSelectorProvider;
+import net.qiujuer.library.clink.impl.IoStealingSelectorProvider;
 import net.qiujuer.library.clink.impl.SchedulerImpl;
 import net.qiujuer.library.clink.utils.CloseUtils;
-import net.qiujuer.library.clink.utils.plugin.CircularByteBuffer;
 import net.qiujuer.sample.audio.audio.AudioRecordThread;
 import net.qiujuer.sample.audio.audio.AudioTrackThread;
 import net.qiujuer.sample.audio.network.ConnectorContracts;
 import net.qiujuer.sample.audio.network.ConnectorInfo;
 import net.qiujuer.sample.audio.network.ServerNamedConnector;
 import net.qiujuer.sample.audio.plugin.BlockingAvailableInputStream;
+import net.qiujuer.library.clink.box.StreamDirectSendPacket;
+import net.qiujuer.library.clink.utils.plugin.CircularByteBuffer;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -179,7 +180,7 @@ public class Presenter implements AppContract.Presenter, ServerNamedConnector.Co
         public void call() {
             try {
                 IoContext.setup()
-                        .ioProvider(new IoSelectorProvider())
+                        .ioProvider(new IoStealingSelectorProvider(2))
                         .scheduler(new SchedulerImpl(1))
                         .start();
 
