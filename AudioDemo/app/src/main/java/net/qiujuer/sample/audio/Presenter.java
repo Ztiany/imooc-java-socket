@@ -180,7 +180,7 @@ public class Presenter implements AppContract.Presenter, ServerNamedConnector.Co
         public void call() {
             try {
                 IoContext.setup()
-                        .ioProvider(new IoStealingSelectorProvider(2))
+                        .ioProvider(new IoSelectorProvider())
                         .scheduler(new SchedulerImpl(1))
                         .start();
 

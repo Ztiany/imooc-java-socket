@@ -5,7 +5,7 @@ package net.qiujuer.sample.audio;
  */
 public interface AppContract {
     // 服务器地址
-    String SERVER_ADDRESS = "www.qiujuer.net";
+    String SERVER_ADDRESS = "192.168.124.3";
     // 服务器端口
     int PORT = 30401;
 
