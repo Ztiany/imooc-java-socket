@@ -31,6 +31,9 @@ public class SocketChannelAdapter implements Sender, Receiver, Cloneable {
 
     @Override
     public void setReceiveListener(IoArgs.IoArgsEventProcessor processor) {
+        if (inputCallback.eventProcessor != processor) {
+            ioProvider.unregister(channel);
+        }
         inputCallback.eventProcessor = processor;
     }
 
@@ -52,6 +55,9 @@ public class SocketChannelAdapter implements Sender, Receiver, Cloneable {
 
     @Override
     public void setSendListener(IoArgs.IoArgsEventProcessor processor) {
+        if (inputCallback.eventProcessor != processor) {
+            ioProvider.unregister(channel);
+        }
         outputCallback.eventProcessor = processor;
     }
 

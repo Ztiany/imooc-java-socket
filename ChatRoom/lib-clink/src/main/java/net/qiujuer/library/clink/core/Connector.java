@@ -25,6 +25,7 @@ public abstract class Connector implements Closeable, SocketChannelAdapter.OnCha
     private SendDispatcher sendDispatcher;
     private ReceiveDispatcher receiveDispatcher;
     private final List<ScheduleJob> scheduleJobs = new ArrayList<>(4);
+    private volatile Connector bridgeConnector;
 
     public void setup(SocketChannel socketChannel) throws IOException {
         this.channel = socketChannel;
@@ -62,57 +63,65 @@ public abstract class Connector implements Closeable, SocketChannelAdapter.OnCha
     /**
      * 改变当前调度器为桥接模式
      */
-    public void changeToBridge() {
-        if (receiveDispatcher instanceof BridgeSocketDispatcher) {
+    public static synchronized void bridge(Connector one, Connector another) {
+        if (one == another) {
+            throw new UnsupportedOperationException("Can not set current connector sender to self bridge mode!");
+        }
+
+        if (one.receiveDispatcher instanceof BridgeSocketDispatcher
+                || another.receiveDispatcher instanceof BridgeSocketDispatcher) {
             // 已改变直接返回
             return;
         }
 
         // 老的停止
-        receiveDispatcher.stop();
+        one.receiveDispatcher.stop();
+        another.receiveDispatcher.stop();
 
         // 构建新的接收者调度器
-        BridgeSocketDispatcher dispatcher = new BridgeSocketDispatcher(receiver);
-        receiveDispatcher = dispatcher;
-        // 启动
-        dispatcher.start();
-    }
+        BridgeSocketDispatcher oneBridgeSocketDispatcher = new BridgeSocketDispatcher(one.receiver, another.sender);
+        BridgeSocketDispatcher anotherBridgeSocketDispatcher = new BridgeSocketDispatcher(another.receiver, one.sender);
 
-    /**
-     * 将另外一个链接的发送者绑定到当前链接的桥接调度器上实现两个链接的桥接功能
-     *
-     * @param sender 另外一个链接的发送者
-     */
-    public void bindToBridge(Sender sender) {
-        if (sender == this.sender) {
-            throw new UnsupportedOperationException("Can not set current connector sender to self bridge mode!");
-        }
+        one.receiveDispatcher = oneBridgeSocketDispatcher;
+        one.sendDispatcher = anotherBridgeSocketDispatcher;
 
-        if (!(receiveDispatcher instanceof BridgeSocketDispatcher)) {
-            throw new IllegalStateException("receiveDispatcher is not BridgeSocketDispatcher!");
-        }
+        another.receiveDispatcher = anotherBridgeSocketDispatcher;
+        another.sendDispatcher = oneBridgeSocketDispatcher;
 
-        ((BridgeSocketDispatcher) receiveDispatcher).bindSender(sender);
+        one.bridgeConnector = another;
+        another.bridgeConnector = one;
+
+        oneBridgeSocketDispatcher.start();
+        anotherBridgeSocketDispatcher.start();
     }
 
     /**
      * 将之前链接的发送者解除绑定，解除桥接数据发送功能
      */
-    public void unBindToBridge() {
-        if (!(receiveDispatcher instanceof BridgeSocketDispatcher)) {
+    public void relieveBridge() {
+        final Connector another = this.bridgeConnector;
+        if (another == null) {
+            return;
+        }
+
+        this.bridgeConnector = null;
+        another.bridgeConnector = null;
+
+        if (!(this.receiveDispatcher instanceof BridgeSocketDispatcher) ||
+                !(another.receiveDispatcher instanceof BridgeSocketDispatcher)) {
             throw new IllegalStateException("receiveDispatcher is not BridgeSocketDispatcher!");
         }
 
-        ((BridgeSocketDispatcher) receiveDispatcher).bindSender(null);
-    }
+        this.receiveDispatcher.stop();
+        another.receiveDispatcher.stop();
 
-    /**
-     * 获取当前链接的发送者
-     *
-     * @return 发送者
-     */
-    public Sender getSender() {
-        return sender;
+        this.sendDispatcher = new AsyncSendDispatcher(sender);
+        this.receiveDispatcher = new AsyncReceiveDispatcher(receiver, receivePacketCallback);
+        this.receiveDispatcher.start();
+
+        another.sendDispatcher = new AsyncSendDispatcher(sender);
+        another.receiveDispatcher = new AsyncReceiveDispatcher(receiver, receivePacketCallback);
+        another.receiveDispatcher.start();
     }
 
     /**

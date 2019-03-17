@@ -18,7 +18,7 @@ public class Server {
         File cachePath = Foo.getCacheDir("server");
 
         IoContext.setup()
-                .ioProvider(new IoStealingSelectorProvider(3))
+                .ioProvider(new IoSelectorProvider())
                 .scheduler(new SchedulerImpl(1))
                 .start();
 
