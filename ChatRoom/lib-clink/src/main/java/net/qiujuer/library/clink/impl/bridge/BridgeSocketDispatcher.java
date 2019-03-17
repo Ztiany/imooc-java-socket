@@ -18,36 +18,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher {
     private final CircularByteBuffer buffer = new CircularByteBuffer(512, true);
     private final Receiver receiver;
+    private final Sender sender;
+    private final SendEventProcessor sendEventProcessor;
 
-    private volatile Sender sender;
-    private volatile SendEventProcessor sendEventProcessor;
-
-    public BridgeSocketDispatcher(Receiver receiver) {
+    public BridgeSocketDispatcher(Receiver receiver, Sender sender) {
         this.receiver = receiver;
-    }
-
-    /**
-     * 绑定一个新的发送者，在绑定时，将老的发送者对应的调度设置为null
-     *
-     * @param sender 新的发送者
-     */
-    public void bindSender(Sender sender) {
-        // 清理老的发送者回调
-        final Sender oldSender = this.sender;
-        if (oldSender != null) {
-            oldSender.setSendListener(null);
-        }
-
-        buffer.clear();
-        sendEventProcessor = null;
-
-        // 设置新的发送者
         this.sender = sender;
-        if (sender != null) {
-            sendEventProcessor = new SendEventProcessor(sender, buffer);
-            sender.setSendListener(sendEventProcessor);
-            sendEventProcessor.requestSend();
-        }
+
+        receiver.setReceiveListener(new ReceiverEventProcessor(buffer));
+        sender.setSendListener(sendEventProcessor = new SendEventProcessor(sender, buffer));
     }
 
     /**
@@ -56,14 +35,14 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
     @Override
     public void start() {
         // nothing
-        receiver.setReceiveListener(new ReceiverEventProcessor(buffer));
-        //requestReceive();
+        requestReceive();
     }
 
     @Override
     public void stop() {
         // nothing
         receiver.setReceiveListener(null);
+        sender.setSendListener(null);
     }
 
     @Override
@@ -113,7 +92,6 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
         @Override
         public IoArgs provideIoArgs() {
             final int spaceWriting = getSpaceWriting();
-            System.out.println("spaceWriting:"+spaceWriting);
             if (spaceWriting > 0) {
                 IoArgs ioArgs = this.ioArgs;
                 ioArgs.limit(spaceWriting);
@@ -129,9 +107,10 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
                 sendEventProcessor.requestSend();
                 requestReceive();
                 return false;
-            } else {
-                new RuntimeException(e).printStackTrace();
+            } else if (e instanceof IOException) {
                 return true;
+            } else {
+                throw new RuntimeException(e);
             }
         }
 
@@ -144,10 +123,7 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
                 }
 
                 // 接收数据后请求发送数据
-                SendEventProcessor sendEventProcessor = BridgeSocketDispatcher.this.sendEventProcessor;
-                if (sendEventProcessor != null) {
-                    sendEventProcessor.requestSend();
-                }
+                sendEventProcessor.requestSend();
 
                 // 继续接收数据
                 return true;
@@ -171,10 +147,9 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
 
         @Override
         public IoArgs provideIoArgs() {
-            final AtomicBoolean isSending = this.isSending;
+            BridgeIllegalStateException.check(isSending.get());
             final int spaceReading = getSpaceReading();
-            System.out.println("spaceReading:"+spaceReading);
-            if (spaceReading > 0 && isSending.get()) {
+            if (spaceReading > 0) {
                 final IoArgs args = this.ioArgs;
                 args.limit(spaceReading);
                 args.startWriting();
@@ -183,38 +158,43 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
                     args.finishWriting();
                     return args;
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    throw new IllegalStateException(e);
                 }
             }
-            assert isSending.compareAndSet(true, false);
             return null;
         }
 
         @Override
         public boolean onConsumeFailed(Throwable e) {
+            BridgeIllegalStateException.check(isSending.compareAndSet(true, false));
             if (e instanceof EmptyIoArgsException) {
                 requestSend();
                 // 无需关闭链接
                 return false;
-            } else {
-                isSending.set(false);
+            } else if (e instanceof IOException) {
                 // 关闭链接
                 return true;
+            } else {
+                throw new RuntimeException(e);
             }
         }
 
         @Override
         public boolean onConsumeCompleted(IoArgs args) {
-            assert isSending.compareAndSet(true, false);
-            requestSend();
-            return false;
+            final int spaceReading = getSpaceReading();
+            if (spaceReading > 0) {
+                return isSending.get();
+            } else {
+                isSending.set(false);
+                return false;
+            }
         }
 
 
         /**
          * 请求网络进行数据发送
          */
-        synchronized void  requestSend() {
+        synchronized void requestSend() {
             final AtomicBoolean isSending = this.isSending;
             final Sender sender = this.sender;
             if (sender != BridgeSocketDispatcher.this.sender || isSending.get()) {
@@ -225,12 +205,10 @@ public class BridgeSocketDispatcher implements ReceiveDispatcher, SendDispatcher
             if (spaceReading > 0 && isSending.compareAndSet(false, true)) {
                 try {
                     sender.postSendAsync();
-                    return;
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    BridgeIllegalStateException.check(isSending.compareAndSet(true, false));
                 }
             }
-            assert isSending.compareAndSet(true, false);
         }
     }
 }
